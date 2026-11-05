@@ -2,7 +2,7 @@ name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review, reopened]
+    types: [opened, synchronize, ready_for_review, reopened, closed]
     # Optional: Only run on specific file changes
     # paths:
     #   - "src/**/*.ts"
@@ -12,34 +12,103 @@ on:
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
+    if: |
+      (github.event.pull_request.merged != true) && (
+        github.event.pull_request.author_association == 'MEMBER' ||
+        github.event.pull_request.author_association == 'OWNER' ||
+        github.event.pull_request.author_association == 'COLLABORATOR'
+      )
 
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      pull-requests: read
-      issues: read
+      contents: write
+      pull-requests: write
+      issues: write
       id-token: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
-          prompt: '/code-review:code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
-          claude_args: '--allowedTools "mcp__github_inline_comment__create_inline_comment"'
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
+          prompt: '/code-review:code-review https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
+          use_sticky_comment: 'true'
+          claude_args: |
+            --max-turns 20
+            --model claude-sonnet-5-5
+            --system-prompt "Voce e um revisor senior Python/Django. Revise em portugues. Foque em: segurança (OWASP), queries N+1, logica de negocio e aderencia ao CLAUDE.md do projeto."
 
+      - name: Gerar testes automaticamente
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Analise o diff deste PR: ${{ github.repository }}/pull/${{ github.event.pull_request.number }}.
+
+            Para cada funcao ou metodo novo que nao possua testes correspondentes:
+            1. Crie testes pytest em portugues
+            2. Salve nos arquivos de teste existentes ou crie novos seguindo o padrao tests/test_*.py
+            3. Faca commit diretamente na branch do PR com a mensagem "test: testes gerados automaticamente pelo Claude"
+
+            Se todos os novos codigos ja tiverem testes, nao faca nada e comente no PR: "✅  Cobertura de testes OK"
+          claude_args: |
+            --max-turns 20
+            --model claude-sonnet-5-5
+
+
+  release-notes:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.base.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Gerar Release Notes
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          show_full_output: 'true'
+          prompt: |
+            O PR #${{ github.event.pull_request.number }} foi mergeado.
+            Titulo: ${{ github.event.pull_request.title }}
+            Autor: ${{ github.event.pull_request.user.login }}
+            Branch: ${{ github.event.pull_request.head.ref }}
+
+            Analise as mudancas deste PR e:
+            1. Abra ou crie o arquivo CHANGELOG.md na raiz do projeto
+            2. Adicione uma nova entrada no topo no seguinte formato:
+
+            ## [DATA] - ${{ github.event.pull_request.title }}
+            **PR:** #${{ github.event.pull_request.number }} por @${{ github.event.pull_request.user.login }}
+
+            ### O que mudou
+            (descricao em linguagem nao tecnica, acessivel para nao-desenvolvedores)
+
+            ### Detalhes tecnicos
+            (resumo tecnico das mudancas principais)
+
+            ---
+
+            3. Faca commit com a mensagem "docs: release notes PR #${{ github.event.pull_request.number }}"
+            4. Faca push direto na branch ${{ github.event.pull_request.base.ref }}
+          claude_args: |
+            --max-turns 15
+            --model claude-sonnet-5-5
+            --dangerously-skip-permissions
