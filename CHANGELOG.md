@@ -1,3 +1,14 @@
+## [2026-11-05] - Teste-4
+**PR:** #5 por @rsenoi
+
+### O que mudou
+Foi adicionada uma nova mensagem de teste ao programa de exemplo, que agora também exibe o texto "Mudando o ambiente para teste-04" quando é executado. É uma alteração pequena, usada apenas para validar o fluxo de trabalho do projeto.
+
+### Detalhes técnicos
+- `teste.py`: adicionada uma linha `print ("Mudando o ambiente para teste-04")` ao final do arquivo.
+
+---
+
 ## [2026-11-05] - teste-3
 **PR:** #4 por @rsenoi
 
