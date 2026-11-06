@@ -1,3 +1,18 @@
+## [2026-11-06] - Teste-5
+**PR:** #6 por @rsenoi
+
+### O que mudou
+Agora, sempre que alguém abre uma nova "issue" (um pedido, dúvida ou relato de problema) no projeto, o assistente Claude lê o texto automaticamente e responde com um comentário de triagem. O comentário classifica o tipo e a gravidade do assunto, estima o esforço necessário, indica quais partes do projeto provavelmente serão afetadas, sugere uma lista de tarefas, aponta pedidos parecidos já abertos e lista dúvidas ou riscos.
+
+### Detalhes técnicos
+- Novo workflow `.github/workflows/claude-code-issues.yml` ("Triagem de Issues com Claude"), disparado em `issues: opened`.
+- Permissões do job: `issues: write`, `contents: read`, `id-token: write`, `pull-requests: write`.
+- Usa `actions/checkout@v4` e `anthropics/claude-code-action@v1` autenticado com `CLAUDE_CODE_OAUTH_TOKEN`.
+- Prompt em português com seções fixas (classificação, arquivos afetados, subtarefas, issues relacionadas, observações).
+- `claude_args`: `--max-turns 30`, `--model claude-sonnet-5-5` e `--dangerously-skip-permissions`.
+
+---
+
 ## [2026-11-05] - Teste-4
 **PR:** #5 por @rsenoi
 
