@@ -1,3 +1,11 @@
+import sys
+
+if len(sys.argv) > 1:
+    print ("Ok")
+else:
+    print ("NOK")
+    sys.exit(1)
+
 print ("Hello Word!!")
 print ("Teste de validacao do Claude!!")
 print ("Mudando o ambiente para teste-02")
